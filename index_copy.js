@@ -4,10 +4,8 @@ import session from 'express-session';
 import bodyParser from 'body-parser';
 import mysql from 'mysql2/promise'
 import db from './db.js'
-import cors from 'cors'
 import MySQLStore  from 'express-mysql-session';
  
-
 const mysqlStore = MySQLStore(session);
 
 dotenv.config()
@@ -30,35 +28,34 @@ const pool = mysql.createPool(options);
 const  sessionStore = new mysqlStore(options, pool);
  
 
-
- 
-
 const app=express();
-const jsonBodyMiddleware = express.json()
-app.use(jsonBodyMiddleware)
-const corsOptions ={
-   origin:['http://127.0.0.1:5173', 'http://127.0.0.1:5174'], 
-   credentials:true,            
-   optionSuccessStatus:200,
-}
-app.use(cors(corsOptions))
+ 
+ 
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+ 
 app.use(bodyParser.json())
+ 
+ 
 app.use(session({
     name: process.env.SESS_NAME,
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     store: sessionStore,
     secret: process.env.SESS_SECRET,
     cookie: {
         maxAge: TWO_HOURS,
-        sameSite: 'none',
-        secure: true
+        sameSite: true,
+        secure: IN_PROD
     }
 }))
-
+ 
+ 
+ 
+ 
+ 
+ 
 app.get('/', (req, res)=>{
     const { userId } = req.session
     res.send(`
@@ -71,7 +68,10 @@ app.get('/', (req, res)=>{
 `}
     `)
 })
-
+ 
+ 
+ 
+ 
 app.get('/home',  async(req,res)=>{
     const {userId} =req.session
      if(userId){
@@ -95,7 +95,10 @@ app.get('/home',  async(req,res)=>{
 }
     
 })
-
+ 
+ 
+ 
+ 
 app.get('/login', (req,res)=>{
     res.send(`
     <h1>Login</h1>
@@ -107,7 +110,9 @@ app.get('/login', (req,res)=>{
     <a href='/register'>Register</a>
     `)
 })
-
+ 
+ 
+ 
 app.get('/register', (req,res)=>{
     res.send(`
     <h1>Register</h1>
@@ -121,10 +126,11 @@ app.get('/register', (req,res)=>{
     <a href='/login'>Login</a>
     `)
 })
-
+ 
+ 
+ 
 app.post('/login', async(req, res, next)=>{
     try{ 
-        console.log(req.body.email)
     const email = req.body.email;
     let password = req.body.password;
     let user = await db.getUserByEmail(email);
@@ -137,21 +143,20 @@ app.post('/login', async(req, res, next)=>{
         return res.send({
             message: "Invalid  password"
         })
-    }
+    }   
         req.session.userId = user.id
         console.log(req.session)
-        res.status(200)
-        res.json('some response')
+        return res.redirect('/home');
     } catch(e){
         console.log(e);
     }
 });
-
-app.get('/testing', (req, res) => {
-    res.header("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
-    res.send('Test OK')
-})
-
+ 
+ 
+ 
+ 
+ 
+ 
 app.post('/register',  async (req, res, next)=>{
     try{
         const firstName = req.body.firstName;
@@ -161,7 +166,6 @@ app.post('/register',  async (req, res, next)=>{
  
  
               if (!firstName || !lastName || !email || !password) {
-                res.header("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
                 return res.sendStatus(400);
              }
  
@@ -169,29 +173,30 @@ app.post('/register',  async (req, res, next)=>{
  
         const user =  await db.insertUser(firstName, lastName, email, password).then(insertId=>{return db.getUser(insertId);});
         req.session.userId = user.id
-        console.log(req.session)
-        res.header("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
-        res.redirect('/register')
-        return
+        
+            return res.redirect('/register') 
  
     } catch(e){    
         console.log(e);
-        res.header("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
         res.sendStatus(400);
     }
 });
-
+ 
+ 
+ 
 app.post('/logout', (req, res)=>{
     console.log(req.session)
     req.session.destroy(err => {
         if(err){
-            res.redirect('/home')
-            return
+            return res.redirect('/home')
         }
         sessionStore.close()
         res.clearCookie(process.env.SESS_NAME)
-        res.sendStatus(201)
+        res.redirect('/login')
     })
 })
-
+ 
+ 
+ 
+ 
 app.listen(PORT, ()=>{console.log(`server is listening on ${PORT}`)});
