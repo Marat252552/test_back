@@ -6,6 +6,7 @@ import mysql from 'mysql2/promise'
 import db from './db.js'
 import cors from 'cors'
 import MySQLStore  from 'express-mysql-session';
+import cookieParser from 'cookie-parser';
  
 
 const mysqlStore = MySQLStore(session);
@@ -15,7 +16,7 @@ dotenv.config()
 const PORT= process.env.APP_PORT;
 const IN_PROD = process.env.NODE_ENV === 'production'
 const TWO_HOURS = 1000 * 60 * 60 * 2
- 
+
 const options ={
     connectionLimit: 10,
     password: process.env.DB_PASS,
@@ -34,10 +35,11 @@ const  sessionStore = new mysqlStore(options, pool);
  
 
 const app=express();
+app.use(cookieParser())
 const jsonBodyMiddleware = express.json()
 app.use(jsonBodyMiddleware)
 const corsOptions ={
-   origin:['http://127.0.0.1:5173', 'http://127.0.0.1:5174'], 
+   origin:['http://localhost:5173', 'http://127.0.0.1:5174'], 
    credentials:true,            
    optionSuccessStatus:200,
 }
@@ -48,14 +50,14 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json())
 app.use(session({
     name: process.env.SESS_NAME,
-    resave: true,
+    resave: false,
     saveUninitialized: true,
     store: sessionStore,
     secret: process.env.SESS_SECRET,
     cookie: {
         maxAge: TWO_HOURS,
-        sameSite: 'none',
-        secure: true
+        // sameSite: 'none',
+        // secure: true
     }
 }))
 
@@ -123,6 +125,7 @@ app.get('/register', (req,res)=>{
 })
 
 app.post('/login', async(req, res, next)=>{
+    console.log(req.cookies)
     try{ 
         console.log(req.body.email)
     const email = req.body.email;
@@ -140,8 +143,7 @@ app.post('/login', async(req, res, next)=>{
     }
         req.session.userId = user.id
         console.log(req.session)
-        res.status(200)
-        res.json('some response')
+        res.sendStatus(200)
     } catch(e){
         console.log(e);
     }
